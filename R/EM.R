@@ -95,14 +95,6 @@ runEM <- function(copy, chr, chrTrain, param, maxiter, verbose = TRUE,
       }
     }
     
-    ## marginalize rho by sample ##
-    #rhoS <- list()
-    #for (s in 1:S){
-    #  rhoS[[s]] <- matrix(0, nrow = K, ncol = N)
-    #  for (k in 1:K){
-    #    rhoS[[s]][k, ] <- colSums(rho[param$jointCNstates[, s] == k, chrTrain])
-    #  }
-    #}
     
     ################ M-step ####################
     if (verbose) { message("runEM iter", i-1 , ": Maximization") }
@@ -217,38 +209,6 @@ get2and3ComponentMixture <- function(ct, ct.sc.status, n, sp, phi){
   return(log(mu))
 }
 
-get2ComponentMixture <- function(ct, n, phi){
-  if (length(phi) > 1 && length(phi) != length(n)){
-    stop("get2ComponentMixture: length(n) not equal to length(phi)")
-  }
-  S <- length(n)
-  #if (length(phi) == 1){
-  #  phi <- rep(phi, length(n))
-  #}
-  cn <- 2
-  #mu <-  ((1 - n) * ct + n * cn) / ((1 - n) * phi + n * cn)
-  mu <- NULL
-  for (s in 1:S){
-    mu <- cbind(mu, ((1 - n[s]) * ct[, s] + n[s] * cn) / ((1 - n[s]) * phi[s] + n[s] * cn))
-  }
-  return(log(mu))
-}
-
-
-# Dirichlet probability density function, returns the probability of vector
-# x under the Dirichlet distribution with parameter vector alpha
-# Author: David Ross http://www.cs.toronto.edu/~dross/code/dirichletpdf.m
-dirichletpdf <- function(x, alpha) {
-  if (any(x < 0)) {
-    return(0);
-  }
-  if (abs(sum(x) - 1) > 1e-3) {
-    stop("Dirichlet PDF: probabilities do not sum to 1")
-    return(0);
-  }
-  p <- exp(lgamma(sum(alpha)) - sum(lgamma(alpha))) * prod(x ^ (alpha - 1))
-  return(p)
-}
 
 dirichletpdflog <- function(x, k) {
   c <- lgamma(sum(k, na.rm = TRUE)) - sum(lgamma(k), na.rm = TRUE)  #normalizing constant
@@ -381,44 +341,8 @@ estimateParamsMap <- function(D, n_prev, sp_prev, phi_prev, lambda_prev, pi_prev
     lambda_hat <- matrix(estLambda$par, ncol = S, byrow = FALSE)
   }
   
-  #}
-  #}
-  
-  #map estimate for phi (ploidy) 
-  # if (estimatePloidy) {
-  #    suppressWarnings(
-  #   estPhi <- optim(phi_prev, fn = phiLikelihoodFun, n = n_prev, lambda = lambda_prev, 
-  #  								params = params, D = D, rho = rhoS, method = "L-BFGS-B",
-  #                 control = list(fnscale = -1, ndeps = 1e-5), lower = intervalPhi[1])#, upper = intervalPhi[2])
-  #  )
-  #  phi_hat <- estPhi$par
-  #}
-  
-  # map estimate for lambda (Student's t precision)
-  # if (estimatePrecision){
-  #for (s in 1:S){
-  #  paramsS <- params
-  #  paramsS$betaLambda <- paramsS$betaLambda[s]
-  #  for (k in 1:K){
-  #		  suppressWarnings(
-  #	  estLambda <- optim(lambda_prev[k, s], fn = lambdaLikelihoodFun, n = n_prev[s], phi = phi_prev, 
-  #										params = paramsS, D = D[, s], rho = rhoS[[s]][k, , drop = FALSE], k = k,
-  #										control = list(fnscale = -1), method = "L-BFGS-B",
-  #										lower = intervalLambda[1])#, upper = intervalLambda[2])
-  
-  
-  #lambda_hat <- matrix(estLambda$par, ncol = S, byrow = TRUE)
-  #  }
-  #}
-  #}
-  #lambda_hat <- estimatePrecisionParamMap(lambda_prev, n_prev, phi_prev, params, D, rho)
-  
-  
-  #rm(a, b, c, d, e)
   gc(verbose = FALSE, reset = TRUE)
-  #if (verbose == TRUE) {
-  #  message("n=", format(n_hat, digits = 2), ", phi=", format(phi_hat, digits = 4), ", lambda=", paste0(format(lambda_hat, digits=2), collapse = " ", sep = ","))
-  #}
+  
   return(list(n = n_hat, sp = sp_hat, phi = phi_hat, lambda = lambda_hat, piG = pi_hat, A = A_hat, F = estLambda$value))
 }
 
@@ -530,18 +454,6 @@ priorProbs <- function(n, sp, phi, lambda, piG, A, params,
               priorN = priorN, priorSP = priorSP, priorPhi = priorPhi, priorPi = priorPi))
 }
 
-estimatePrecisionParamMap <- function(lambda, n, phi, params, D, rho){
-  mu <- get2ComponentMixture(params$ct, n, phi)
-  mu_0 <- get2ComponentMixture(params$ct, params$n_0, params$phi_0)
-  yr <- t(matrix(D, length(D), length(mu)))        # Vectorize parameter
-  u <- (1 + params$nu) / (((yr - mu) ^ 2) * lambda + params$nu); # scale parameter
-  
-  # Calculate the precision
-  lambda_hat <- (rowSums(rho, na.rm = TRUE) + params$alphaLambda + 1) /
-    (rowSums(rho * u * ((yr - mu) ^ 2), na.rm = TRUE) +
-       (params$eta * (mu - mu_0) ^ 2 + params$betaLambda))
-  return(lambda_hat)
-}
 
 estimateMixWeightsParamMap <- function(rho, kappa) {
   K <- nrow(rho)
